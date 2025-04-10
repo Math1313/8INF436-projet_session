@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler, OneHotEncoder
+from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE
 
 # Modifier les limitations d'affichage par défaut de Pandas pour faciliter l'exploration des données.
 pd.set_option('display.max_columns', 50)
@@ -10,46 +12,48 @@ pd.set_option('display.max_rows', 25)
 pd.set_option('display.max_colwidth', None)
 pd.set_option('display.width', None)
 
-# Load the data
-def get_data():
-    data = pd.read_csv('../data/heart_disease_uci.csv')
-    data = data.drop(['id'], axis=1)
+
+def create_binary_target(data, target_column='num'):
+    """
+    Fonction utilitaire qui permet de convertir la variable cible en binaire
+    """
+    data[target_column] = data[target_column].apply(lambda x: 1 if x > 0 else 0)
+    print(data[target_column].value_counts())
 
     return data
 
-
 def exploration(data, save_graphs, display_graphs):
-    # show histograms
+    """
+    Fonction utilitaire qui permet d'explorer les données
+    """
+    # Afficher les histogrammes des toutes les variables
     data.hist(bins=50, figsize=(15, 10))
     if save_graphs: plt.savefig('../output/histograms.png')
     if display_graphs: plt.show()
 
-    # show boxplot of numeric data
+    # Afficher les boîtes à moustaches pour toutes les variables numériques
+    # Cela permet de visualiser les valeurs aberrantes
     data.select_dtypes(include=['int64', 'float64']).plot(kind='box', subplots=True, layout=(4, 6), figsize=(15, 10))
     if save_graphs: plt.savefig('../output/boxplots.png')
     if display_graphs: plt.show()
 
-    # print the info of the data<
+    # Afficher les informations sur les données
+    # Permet de voir le nombre de valeurs manquantes et les types de données
     print(data.info())
-    # print number of missing values of each column
     print(data.isnull().sum())
-
-    # return the description of the data
     print(data.describe(include='all'))
 
 
 def preprocess_data_imputation(data):
-
-    # Compter le nombre de valeurs manquantes par colonne
+    """
+    Fonction utilitaire qui permet de traiter les valeurs manquantes
+    """
+    # Supprimer les colonnes avec 50% ou plus de valeurs manquantes
     missing_values_count = data.isnull().sum()
-
-    # Identifier les colonnes avec un nombre de valeurs manquantes supérieur à 60% du nombre total de lignes
-    columns_to_remove = missing_values_count[missing_values_count > 0.6 * data.shape[0]].index
-
-    # Supprimer les colonnes identifiées
+    columns_to_remove = missing_values_count[missing_values_count > 0.5 * data.shape[0]].index
     data = data.drop(columns=columns_to_remove)
 
-    # Séparer les colonnes numériques par type (int et float)
+    # Séparer les colonnes numériques par type (int et float) ainsi que les colonnes catégorielles
     int_columns = data.select_dtypes(include=['int64']).columns
     float_columns = data.select_dtypes(include=['float64']).columns
     categorical_columns = data.select_dtypes(include=['object', 'category']).columns
@@ -66,7 +70,7 @@ def preprocess_data_imputation(data):
         if data[column].isnull().sum() > 0:
             data[column] = data[column].fillna(data[column].mean())
 
-    # Traiter les colonnes catégorielles si elles existent
+    # Traiter les colonnes catégorielles
     if len(categorical_columns) > 0:
 
         # Encoder les variables catégorielles
@@ -87,6 +91,8 @@ def preprocess_data_imputation(data):
         )
 
         # Arrondir les valeurs imputées à l'entier le plus proche
+        # Cela permettra de conserver la nature discrète des variables catégorielles
+        # et ainsi pouvoir inverser l'encodage pour obtenir les catégories originales
         categorical_imputed = categorical_imputed.round().astype(int)
 
         # Inverser l'encodage pour retrouver les catégories originales
@@ -103,14 +109,15 @@ def preprocess_data_imputation(data):
     return data
 
 
-def handle_outliers_with_iqr(data, factor=1.5):
-
+def handle_outliers_with_iqr(data, factor=1.2):
+    """
+    Fonction utilitaire qui permet de traiter les valeurs aberrantes
+    """
     # Sélectionner toutes les colonnes numériques
     columns = data.select_dtypes(include=['int64', 'float64']).columns
 
     # Traiter chaque colonne spécifiée
     for column in columns:
-
         # Calcul des quartiles
         Q1 = data[column].quantile(0.25)
         Q3 = data[column].quantile(0.75)
@@ -131,70 +138,107 @@ def handle_outliers_with_iqr(data, factor=1.5):
         if original_type == 'int64':
             data[column] = data[column].round().astype('int64')
 
-        return data
-
-# def preprocess_data_encode_and_scale(data):
-#     # Séparer les colonnes numériques par type (int et float)
-#     num_columns = data.select_dtypes(include=['int64', 'float64']).columns
-#     categorical_columns = data.select_dtypes(include=['object', 'category']).columns
-#
-#     # Encoder les variables catégorielles
-#     encoder = LabelEncoder()
-#     categorical_data = data[categorical_columns].copy()
-#     categorical_encoded = pd.DataFrame(
-#         encoder.fit_transform(categorical_data),
-#         columns=categorical_columns,
-#         index=categorical_data.index
-#     )
-#
-#     # Normaliser les colonnes numériques
-#     scaler = StandardScaler()
-#     numeric_data = data[num_columns].copy()
-#     numeric_scaled = pd.DataFrame(
-#         scaler.fit_transform(numeric_data),
-#         columns=num_columns,
-#         index=numeric_data.index
-#     )
-#
-#     # Combiner les données encodées et normalisées avec les colonnes non modifiées
-#     data = pd.concat([numeric_scaled, categorical_encoded], axis=1)
-#
-#     return data
+    return data
 
 def preprocess_data_encode_and_scale(data, target_column='num'):
-    # # Séparation X et y
-    # X = df.drop(columns=[target_column])
-    # y = df[target_column]
+    """
+    Fonction utilitaire qui permet d'appliquer un encodage des valeurs catégorielles
+    et une normalisation des valeurs numériques
+    """
+    # Séparation X et y
+    X = data.drop(columns=[target_column])
+    y = data[target_column]
 
     # Identifier types de colonnes
-    numeric_cols = data.select_dtypes(include=['int64', 'float64']).columns.tolist()
-    categorical_cols = data.select_dtypes(include=['object', 'bool']).columns.tolist()
+    numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    categorical_cols = X.select_dtypes(include=['object', 'bool']).columns.tolist()
 
-    # --- Standardisation des colonnes numériques ---
+    # Standardisation des colonnes numériques pour les mettre à l'échelle
     scaler = StandardScaler()
-    X_numeric = pd.DataFrame(scaler.fit_transform(data[numeric_cols]), columns=numeric_cols)
+    X_numeric = pd.DataFrame(scaler.fit_transform(X[numeric_cols]), columns=numeric_cols)
 
-    # --- Encodage des colonnes catégorielles ---
+    # Encodage des colonnes catégorielles, car la plupart des algorithmes de
+    # ML ne peuvent pas traiter les variables catégorielles
     encoder = OneHotEncoder(drop='first', sparse_output=False)
     X_categorical = pd.DataFrame(
-        encoder.fit_transform(data[categorical_cols]),
+        encoder.fit_transform(X[categorical_cols]),
         columns=encoder.get_feature_names_out(categorical_cols)
     )
 
-    # --- Fusionner ---
+    # Recréer le DataFrame avec les colonnes numériques, catégorielles avec la variable cible
     data = pd.concat([X_numeric.reset_index(drop=True), X_categorical.reset_index(drop=True)], axis=1)
+    data = pd.concat([data, y.reset_index(drop=True)], axis=1)
 
     return data
 
-def main():
-    data = get_data()
+def preprocess_data(data, target_column='num'):
+    """
+    Fonction utilitaire qui permet d'effectuer l'ensemble des pré-traitements sur les données
+    """
+    # Traiter les valeurs manquantes
     data = preprocess_data_imputation(data)
-    data = handle_outliers_with_iqr(data)
-    data = preprocess_data_encode_and_scale(data)
 
-    # print(exploration(data, save_graphs=False, display_graphs=False))
+    # Gérer les outliers
+    data = handle_outliers_with_iqr(data)
+
+    # Appliquer un encodage des valeurs catégorielles (OneHotEncoder)
+    # Normaliser des valeurs numériques (StandardScaler)
+    data = preprocess_data_encode_and_scale(data, target_column=target_column)
+
+    return data
+
+def resample_target_variable(X, y):
+    """
+    Fonction utilitaire qui permet de rééchantillonner la variable cible
+    """
+    smote = SMOTE(random_state=42)
+    X_train_balanced, y_train_balanced = smote.fit_resample(X, y)
+
+    return X_train_balanced, y_train_balanced
+
+def main():
+    """
+    TRAITEMENT DES DONNÉES
+    """
+    # Charger les données
+    # Éliminer l'identifiant unique, car il n'est pas pertinent pour l'analyse
+    data = pd.read_csv('../data/heart_disease_uci.csv')
+    data = data.drop(['id'], axis=1)
+
+    # Eplorer rapidement les données
+    # 1. Il y a des valeurs manquantes
+    # 2. Il y a des valeurs aberrantes
+    # Enregistrer les graphiques dans le dossier "output" et les afficher si possible
+    # print(exploration(data, save_graphs=True, display_graphs=True))
+
+    # Comme la variable cible contient 5 catégories, nous allons la convertir en binaire
+    # 0 = aucune maladie cardiaque
+    # 1,2,3,4 = maladie cardiaque
+    # Cela facilite l'analyse et la modélisation. Cela donnera également plus de poids à la classe 1
+    data = create_binary_target(data, target_column='num')
+
+    # Pré-traiter les données en utilisant une fonction qui appellera les autres
+    # fonctions nécessaires au prétraitement des données
+    data = preprocess_data(data, target_column='num')
+
     print(data)
 
+    # Séparer les données en ensembles d'entraînement et de test
+    X = data.drop(columns=['num'])
+    y = data['num']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=2)
+
+    # Comme notre jeu de données à un nombre raisonnable de variables, nous n'utiliserons pas de PCA
+    # Ré-échantillonner la variable cible pour équilibrer les classes si nécessaire
+    # Le déséquilibre limite acceptable de la variable cible est de 35% - 65%
+    target_counts = y_train.value_counts(normalize=True) * 100
+    if min(target_counts) <= 35:
+        X_train, y_train = resample_target_variable(X_train, y_train)
+
+    """
+    ENTRAINEMENT DES MODÈLES DE CLASSIFICATION BINAIRE
+    """
+    return 0
 
 if __name__ == "__main__":
     main()
