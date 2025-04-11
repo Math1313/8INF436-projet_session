@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler, OneHotEncoder
+from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 
@@ -187,6 +189,31 @@ def preprocess_data(data, target_column='num'):
 
     return data
 
+
+def apply_pca(X, n_components=0.95, print_variance=False):
+    """
+    Fonction utilitaire qui permet d'appliquer PCA sur les données
+    """
+    pca = PCA(n_components=n_components)
+    X_pca = pca.fit_transform(X)
+
+    # Enregistrer le modèle PCA, car il sera utilisé pour transformer les nouvelles données
+    with open("../models/pca.pkl", 'wb') as file:
+        pickle.dump(pca, file)
+
+    # Afficher la variance expliquée par chaque composante principale
+    if print_variance:
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(pca.explained_variance_ratio_) + 1), pca.explained_variance_ratio_, marker='o')
+        plt.title('Variance expliquée par chaque composante principale')
+        plt.xlabel('Composantes principales')
+        plt.ylabel('Variance expliquée')
+        plt.grid()
+        plt.savefig('../output/variance.png')
+        plt.show()
+
+    return X_pca
+
 def resample_target_variable(X, y):
     """
     Fonction utilitaire qui permet de rééchantillonner la variable cible
@@ -223,12 +250,16 @@ def main():
 
     print(data)
 
-    # Séparer les données en ensembles d'entraînement et de test
+    # Séparer les variables explicatives et la variable cible
     X = data.drop(columns=['num'])
     y = data['num']
+
+    # Appliquer PCA pour réduire la dimensionnalité
+    X = apply_pca(X, n_components=0.95, print_variance=True)
+
+    # Diviser les données en ensembles d'entraînement et de test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=2)
 
-    # Comme notre jeu de données à un nombre raisonnable de variables, nous n'utiliserons pas de PCA
     # Ré-échantillonner la variable cible pour équilibrer les classes si nécessaire
     # Le déséquilibre limite acceptable de la variable cible est de 35% - 65%
     target_counts = y_train.value_counts(normalize=True) * 100
