@@ -1,17 +1,12 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
+
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler, OneHotEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
-
-# Modifier les limitations d'affichage par défaut de Pandas pour faciliter l'exploration des données.
-pd.set_option('display.max_columns', 50)
-pd.set_option('display.max_rows', 25)
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.width', None)
-
 
 def create_binary_target(data, target_column='num'):
     """
@@ -146,16 +141,25 @@ def preprocess_data_encode_and_scale(data, target_column='num'):
     et une normalisation des valeurs numériques
     """
     # Séparation X et y
-    X = data.drop(columns=[target_column])
-    y = data[target_column]
+    target_column_exist = target_column in data.columns
+
+    X = data.copy()
+    if target_column_exist:
+        X = data.drop(columns=[target_column])
+        y = data[target_column]
 
     # Identifier types de colonnes
     numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_cols = X.select_dtypes(include=['object', 'bool']).columns.tolist()
+    print(numeric_cols)
+    print(categorical_cols)
 
     # Standardisation des colonnes numériques pour les mettre à l'échelle
     scaler = StandardScaler()
     X_numeric = pd.DataFrame(scaler.fit_transform(X[numeric_cols]), columns=numeric_cols)
+
+    with open('../tools/num_scaler.pkl', 'wb') as file:
+        pickle.dump(scaler, file)
 
     # Encodage des colonnes catégorielles, car la plupart des algorithmes de
     # ML ne peuvent pas traiter les variables catégorielles
@@ -164,10 +168,14 @@ def preprocess_data_encode_and_scale(data, target_column='num'):
         encoder.fit_transform(X[categorical_cols]),
         columns=encoder.get_feature_names_out(categorical_cols)
     )
+    print(X_categorical.shape)
+
+    with open('../tools/cat_encoder.pkl', 'wb') as file:
+        pickle.dump(encoder, file)
 
     # Recréer le DataFrame avec les colonnes numériques, catégorielles avec la variable cible
     data = pd.concat([X_numeric.reset_index(drop=True), X_categorical.reset_index(drop=True)], axis=1)
-    data = pd.concat([data, y.reset_index(drop=True)], axis=1)
+    if target_column_exist: data = pd.concat([data, y.reset_index(drop=True)], axis=1)
 
     return data
 
@@ -187,6 +195,31 @@ def preprocess_data(data, target_column='num'):
 
     return data
 
+
+def apply_pca(X, n_components=0.90, print_variance=False):
+    """
+    Fonction utilitaire qui permet d'appliquer PCA sur les données
+    """
+    pca = PCA(n_components=n_components)
+    X_pca = pca.fit_transform(X)
+
+    # Enregistrer le modèle PCA, car il sera utilisé pour transformer les nouvelles données
+    with open("../tools/pca.pkl", 'wb') as file:
+        pickle.dump(pca, file)
+
+    # Afficher la variance expliquée par chaque composante principale
+    if print_variance:
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(pca.explained_variance_ratio_) + 1), pca.explained_variance_ratio_, marker='o')
+        plt.title('Variance expliquée par chaque composante principale')
+        plt.xlabel('Composantes principales')
+        plt.ylabel('Variance expliquée')
+        plt.grid()
+        plt.savefig('../output/variance.png')
+        plt.show()
+
+    return X_pca
+
 def resample_target_variable(X, y):
     """
     Fonction utilitaire qui permet de rééchantillonner la variable cible
@@ -195,50 +228,3 @@ def resample_target_variable(X, y):
     X_train_balanced, y_train_balanced = smote.fit_resample(X, y)
 
     return X_train_balanced, y_train_balanced
-
-def main():
-    """
-    TRAITEMENT DES DONNÉES
-    """
-    # Charger les données
-    # Éliminer l'identifiant unique, car il n'est pas pertinent pour l'analyse
-    data = pd.read_csv('../data/heart_disease_uci.csv')
-    data = data.drop(['id'], axis=1)
-
-    # Eplorer rapidement les données
-    # 1. Il y a des valeurs manquantes
-    # 2. Il y a des valeurs aberrantes
-    # Enregistrer les graphiques dans le dossier "output" et les afficher si possible
-    # print(exploration(data, save_graphs=True, display_graphs=True))
-
-    # Comme la variable cible contient 5 catégories, nous allons la convertir en binaire
-    # 0 = aucune maladie cardiaque
-    # 1,2,3,4 = maladie cardiaque
-    # Cela facilite l'analyse et la modélisation. Cela donnera également plus de poids à la classe 1
-    data = create_binary_target(data, target_column='num')
-
-    # Pré-traiter les données en utilisant une fonction qui appellera les autres
-    # fonctions nécessaires au prétraitement des données
-    data = preprocess_data(data, target_column='num')
-
-    print(data)
-
-    # Séparer les données en ensembles d'entraînement et de test
-    X = data.drop(columns=['num'])
-    y = data['num']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=2)
-
-    # Comme notre jeu de données à un nombre raisonnable de variables, nous n'utiliserons pas de PCA
-    # Ré-échantillonner la variable cible pour équilibrer les classes si nécessaire
-    # Le déséquilibre limite acceptable de la variable cible est de 35% - 65%
-    target_counts = y_train.value_counts(normalize=True) * 100
-    if min(target_counts) <= 35:
-        X_train, y_train = resample_target_variable(X_train, y_train)
-
-    """
-    ENTRAINEMENT DES MODÈLES DE CLASSIFICATION BINAIRE
-    """
-    return 0
-
-if __name__ == "__main__":
-    main()
