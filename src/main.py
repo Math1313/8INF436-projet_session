@@ -22,36 +22,6 @@ pd.set_option('display.max_colwidth', None)
 pd.set_option('display.width', None)
 
 
-# def train_model_with_cv(X_train, y_train):
-#     model = RandomForestClassifier(
-#         n_estimators=60,
-#         max_depth=10,
-#         min_samples_split=2,
-#         random_state=42
-#     )
-#     scoring = ['accuracy', 'precision', 'recall', 'f1']
-#     scores = cross_validate(model, X_train, y_train, scoring=scoring, cv=5, return_train_score=True)
-#
-#     print("\nValidation croisée - Moyennes des scores :")
-#     for metric in scoring:
-#         print(f"{metric.capitalize()} : {np.mean(scores[f'test_{metric}']):.4f}")
-#
-#     model.fit(X_train, y_train)
-#     return model, scores
-#
-#
-# def plot_learning_curves(scores):
-#     plt.figure(figsize=(8, 5))
-#     plt.plot(scores['train_accuracy'], label='Train Accuracy', marker='o')
-#     plt.plot(scores['test_accuracy'], label='Test Accuracy', marker='o')
-#     plt.title("Courbe d'apprentissage - Accuracy")
-#     plt.xlabel("Fold")
-#     plt.ylabel("Score")
-#     plt.legend()
-#     plt.grid(True)
-#     plt.tight_layout()
-#     plt.show()
-
 
 def train_model_with_cv(X_train, y_train, model):
     """
@@ -66,18 +36,6 @@ def train_model_with_cv(X_train, y_train, model):
     model.fit(X_train, y_train)
     return model, scores
 
-# def plot_learning_curves(scores, model_name, show_graphs=False):
-#     plt.figure(figsize=(8, 5))
-#     plt.plot(scores['train_accuracy'], label='Train Accuracy', marker='o')
-#     plt.plot(scores['test_accuracy'], label='Test Accuracy', marker='o')
-#     plt.title(f'Learning Curve for {model_name}')
-#     plt.xlabel("Fold")
-#     plt.ylabel("Score")
-#     plt.legend()
-#     plt.grid(True)
-#     plt.tight_layout()
-#     plt.savefig(f'../output/{model_name.lower()}_learning_curve.png')
-#     plt.show()
 
 def plot_learning_curves(estimator, X_train, X_test, y_train, y_test, model_name, show_graphs=False):
     """
@@ -144,7 +102,7 @@ def main():
     y = data['num']
 
     # Appliquer PCA pour réduire la dimensionnalité
-    X = prep_data.apply_pca(X, n_components=0.90, print_variance=True)
+    X = prep_data.apply_pca(X, n_components=0.90, print_variance=False)
 
     # Diviser les données en ensembles d'entraînement et de test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=2)
@@ -158,16 +116,6 @@ def main():
     """
     ENTRAINEMENT DES MODÈLES DE CLASSIFICATION BINAIRE
     """
-    # model, scores = train_model_with_cv(X_train, y_train)
-    #
-    # with open('../models/random_forest_model.pkl', 'wb') as file:
-    #     pickle.dump(model, file)
-    #
-    # y_pred = model.predict(X_test)
-    # print("\nRapport de classification sur l'ensemble de test :")
-    # print(classification_report(y_test, y_pred))
-    #
-    # plot_learning_curves(scores)
 
     models = {
         'RandomForest': RandomForestClassifier(

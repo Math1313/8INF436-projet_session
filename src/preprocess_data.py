@@ -141,16 +141,25 @@ def preprocess_data_encode_and_scale(data, target_column='num'):
     et une normalisation des valeurs numériques
     """
     # Séparation X et y
-    X = data.drop(columns=[target_column])
-    y = data[target_column]
+    target_column_exist = target_column in data.columns
+
+    X = data.copy()
+    if target_column_exist:
+        X = data.drop(columns=[target_column])
+        y = data[target_column]
 
     # Identifier types de colonnes
     numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_cols = X.select_dtypes(include=['object', 'bool']).columns.tolist()
+    print(numeric_cols)
+    print(categorical_cols)
 
     # Standardisation des colonnes numériques pour les mettre à l'échelle
     scaler = StandardScaler()
     X_numeric = pd.DataFrame(scaler.fit_transform(X[numeric_cols]), columns=numeric_cols)
+
+    with open('../tools/num_scaler.pkl', 'wb') as file:
+        pickle.dump(scaler, file)
 
     # Encodage des colonnes catégorielles, car la plupart des algorithmes de
     # ML ne peuvent pas traiter les variables catégorielles
@@ -159,10 +168,14 @@ def preprocess_data_encode_and_scale(data, target_column='num'):
         encoder.fit_transform(X[categorical_cols]),
         columns=encoder.get_feature_names_out(categorical_cols)
     )
+    print(X_categorical.shape)
+
+    with open('../tools/cat_encoder.pkl', 'wb') as file:
+        pickle.dump(encoder, file)
 
     # Recréer le DataFrame avec les colonnes numériques, catégorielles avec la variable cible
     data = pd.concat([X_numeric.reset_index(drop=True), X_categorical.reset_index(drop=True)], axis=1)
-    data = pd.concat([data, y.reset_index(drop=True)], axis=1)
+    if target_column_exist: data = pd.concat([data, y.reset_index(drop=True)], axis=1)
 
     return data
 
@@ -191,7 +204,7 @@ def apply_pca(X, n_components=0.90, print_variance=False):
     X_pca = pca.fit_transform(X)
 
     # Enregistrer le modèle PCA, car il sera utilisé pour transformer les nouvelles données
-    with open("../models/pca.pkl", 'wb') as file:
+    with open("../tools/pca.pkl", 'wb') as file:
         pickle.dump(pca, file)
 
     # Afficher la variance expliquée par chaque composante principale
