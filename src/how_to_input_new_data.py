@@ -33,10 +33,7 @@ new_data = {
     'slope': ['flat'],
 }
 
-# Convertir en DataFrame
-new_data_df = pd.DataFrame(new_data)
-numeric_cols = new_data_df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-categorical_cols = new_data_df.select_dtypes(include=['object', 'bool']).columns.tolist()
+
 
 # Charger le modèle entraîné
 with open('../models/randomforest_model.pkl', 'rb') as file:
@@ -50,6 +47,10 @@ with open('../tools/cat_encoder.pkl', 'rb') as file:
 with open('../tools/pca.pkl', 'rb') as file:
     pca = pickle.load(file)
 
+# Convertir en DataFrame
+new_data_df = pd.DataFrame(new_data)
+numeric_cols = new_data_df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+categorical_cols = new_data_df.select_dtypes(include=['object', 'bool']).columns.tolist()
 
 # Appliquer le scaler aux colonnes numériques
 new_data_numeric_scaled = scaler.transform(new_data_df[numeric_cols])
