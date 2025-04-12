@@ -13,8 +13,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Chargement des composants de transformation et des modèles
         self.load_components_and_models()
 
-        self.setWindowTitle("Prédiction Risque Cardiaque")
-        self.setGeometry(100, 100, 600, 500)
+        self.setWindowTitle("Application de Prédiction et Métriques")
+        self.setGeometry(100, 100, 800, 600)
         self.setStyleSheet("""
             QWidget {
                 background-color: #F0F8FF;
@@ -39,16 +39,31 @@ class MainWindow(QtWidgets.QMainWindow):
             QLabel {
                 padding: 5px;
             }
+            QTableWidget {
+                border: 1px solid #A9A9A9;
+                border-radius: 5px;
+            }
         """)
 
-        # Création du widget central et mise en place d'un layout
-        central_widget = QtWidgets.QWidget(self)
-        self.setCentralWidget(central_widget)
+        # Création d'un QTabWidget pour contenir les deux onglets
+        self.tabs = QtWidgets.QTabWidget()
+        self.setCentralWidget(self.tabs)
 
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
+        # Onglet de prédiction
+        self.prediction_tab = QtWidgets.QWidget()
+        self.create_prediction_tab()
+        self.tabs.addTab(self.prediction_tab, "Prédiction")
+
+        # Onglet des métriques
+        self.metrics_tab = QtWidgets.QWidget()
+        self.create_metrics_tab()
+        self.tabs.addTab(self.metrics_tab, "Métriques")
+
+    def create_prediction_tab(self):
+        layout = QtWidgets.QVBoxLayout(self.prediction_tab)
         form_layout = QtWidgets.QFormLayout()
         form_layout.setSpacing(10)
-        main_layout.addLayout(form_layout)
+        layout.addLayout(form_layout)
 
         # Champs d'entrée de données
         self.age_edit = QtWidgets.QLineEdit()
@@ -88,9 +103,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.oldpeak_edit = QtWidgets.QLineEdit()
         form_layout.addRow("Oldpeak (dépression ST) :", self.oldpeak_edit)
 
-        self.slope_combo = QtWidgets.QComboBox()
-        self.slope_combo.addItems(["upsloping", "flat", "downslopeing"])
-        form_layout.addRow("slopee :", self.slope_combo)
+        self.slop_combo = QtWidgets.QComboBox()
+        self.slop_combo.addItems(["upsloping", "flat", "downsloping"])
+        form_layout.addRow("Slope :", self.slop_combo)
 
         # Sélection du modèle à utiliser
         self.model_combo = QtWidgets.QComboBox()
@@ -100,12 +115,51 @@ class MainWindow(QtWidgets.QMainWindow):
         # Bouton de prédiction
         self.predict_button = QtWidgets.QPushButton("Prédiction")
         self.predict_button.clicked.connect(self.make_prediction)
-        main_layout.addWidget(self.predict_button)
+        layout.addWidget(self.predict_button)
 
         # Zone d'affichage du résultat
         self.result_label = QtWidgets.QLabel("Résultat de la prédiction s'affichera ici.")
         self.result_label.setAlignment(QtCore.Qt.AlignCenter)
-        main_layout.addWidget(self.result_label)
+        layout.addWidget(self.result_label)
+
+    def create_metrics_tab(self):
+        layout = QtWidgets.QVBoxLayout(self.metrics_tab)
+        # Titre de l'onglet
+        title = QtWidgets.QLabel("Métriques des Modèles")
+        title.setAlignment(QtCore.Qt.AlignCenter)
+        title.setStyleSheet("font-weight: bold; font-size: 16px;")
+        layout.addWidget(title)
+
+        # Création du tableau pour afficher les métriques
+        self.metrics_table = QtWidgets.QTableWidget()
+        layout.addWidget(self.metrics_table)
+
+        # Chargement des données du CSV et remplissage du tableau
+        self.load_metrics()
+
+    def load_metrics(self):
+        # Chemin du fichier CSV
+        csv_path = os.path.join("..", "output", "model_results.csv")
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement du CSV des métriques:\n{e}")
+            return
+
+        # Configuration du QTableWidget
+        self.metrics_table.setRowCount(df.shape[0])
+        self.metrics_table.setColumnCount(df.shape[1])
+        self.metrics_table.setHorizontalHeaderLabels(df.columns.tolist())
+
+        # Remplissage du tableau
+        for row in range(df.shape[0]):
+            for col in range(df.shape[1]):
+                item = QtWidgets.QTableWidgetItem(str(df.iat[row, col]))
+                item.setTextAlignment(QtCore.Qt.AlignCenter)
+                self.metrics_table.setItem(row, col, item)
+
+        # Ajustement automatique de la largeur des colonnes
+        self.metrics_table.resizeColumnsToContents()
 
     def load_components_and_models(self):
         """
@@ -178,7 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
             new_data = {
                 "age": int(self.age_edit.text().strip()),
                 "sex": "Male" if self.sex_combo.currentText() == "Homme" else "Female",
-                "dataset": self.location_combo.currentText(),
+                "location": self.location_combo.currentText(),
                 "cp": self.cp_combo.currentText(),
                 "fbs": self.fbs_checkbox.isChecked(),
                 "trestbps": int(self.trestbps_edit.text().strip()),
@@ -187,7 +241,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "thalch": int(self.thalch_edit.text().strip()),
                 "exang": self.exang_checkbox.isChecked(),
                 "oldpeak": float(self.oldpeak_edit.text().strip()),
-                "slope": self.slope_combo.currentText()
+                "slop": self.slop_combo.currentText()
             }
 
             # Conversion en DataFrame
