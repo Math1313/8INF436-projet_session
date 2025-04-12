@@ -3,6 +3,7 @@ import pandas as pd
 import preprocess_data as prep_data
 
 # Exemple de nouvelle donnée
+# Example 1 = 1
 # new_data = {
 #     'age': [63],
 #     'sex': ['Male'],
@@ -18,6 +19,7 @@ import preprocess_data as prep_data
 #     'slope': ['downsloping']
 # }
 
+# Example 2 = 0
 new_data = {
     'age': [67],
     'sex': ['Male'],

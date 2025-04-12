@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import csv
 import pickle
 
 from sklearn.ensemble import RandomForestClassifier
@@ -23,6 +24,28 @@ pd.set_option('display.width', None)
 
 
 
+def exploration(data, save_graphs, display_graphs, data_state):
+    """
+    Fonction utilitaire qui permet d'explorer les données
+    """
+    # Afficher les histogrammes des toutes les variables
+    data.hist(bins=50, figsize=(15, 10))
+    if save_graphs: plt.savefig(f"../output/histograms_{data_state}.png")
+    if display_graphs: plt.show()
+
+    # Afficher les boîtes à moustaches pour toutes les variables numériques
+    # Cela permet de visualiser les valeurs aberrantes
+    data.select_dtypes(include=['int64', 'float64']).plot(kind='box', subplots=True, layout=(4, 6), figsize=(15, 10))
+    if save_graphs: plt.savefig(f'../output/boxplots_{data_state}.png')
+    if display_graphs: plt.show()
+
+    # Afficher les informations sur les données
+    # Permet de voir le nombre de valeurs manquantes et les types de données
+    print(data.info())
+    print(data.isnull().sum())
+    print(data.describe(include='all'))
+
+
 def train_model_with_cv(X_train, y_train, model):
     """
     Fonction utilitaire qui permet d'entraîner un modèle avec validation croisée
@@ -30,12 +53,8 @@ def train_model_with_cv(X_train, y_train, model):
     scoring = ['accuracy', 'precision', 'recall', 'f1']
     scores = cross_validate(model, X_train, y_train, scoring=scoring, cv=5, return_train_score=True)
 
-    for metric in scoring:
-        print(f"{metric.capitalize()} : {np.mean(scores[f'test_{metric}']):.4f}")
-
     model.fit(X_train, y_train)
     return model, scores
-
 
 def plot_learning_curves(estimator, X_train, X_test, y_train, y_test, model_name, show_graphs=False):
     """
@@ -83,7 +102,7 @@ def main():
     # 1. Il y a des valeurs manquantes
     # 2. Il y a des valeurs aberrantes
     # Enregistrer les graphiques dans le dossier "output" et les afficher si possible
-    # print(exploration(data, save_graphs=True, display_graphs=True))
+    print(exploration(data, save_graphs=True, display_graphs=False, data_state="raw"))
 
     # Comme la variable cible contient 5 catégories, nous allons la convertir en binaire
     # 0 = aucune maladie cardiaque
@@ -95,7 +114,7 @@ def main():
     # fonctions nécessaires au prétraitement des données
     data = prep_data.preprocess_data(data, target_column='num')
 
-    print(data)
+    print(exploration(data, save_graphs=True, display_graphs=False, data_state="preprocessed"))
 
     # Séparer les variables explicatives et la variable cible
     X = data.drop(columns=['num'])
@@ -112,6 +131,8 @@ def main():
     target_counts = y_train.value_counts(normalize=True) * 100
     if min(target_counts) <= 35:
         X_train, y_train = prep_data.resample_target_variable(X_train, y_train)
+
+
 
     """
     ENTRAINEMENT DES MODÈLES DE CLASSIFICATION BINAIRE
@@ -143,6 +164,21 @@ def main():
         )
     }
 
+    # Créer un fichier CSV pour stocker les résultats
+    csv_file_path = '../output/model_results.csv'
+    with open(csv_file_path, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow([
+            "Model",
+            "Test Accuracy",
+            "Precision (0)",
+            "Recall (0)",
+            "F1 Score (0)",
+            "Precision (1)",
+            "Recall (1)",
+            "F1 Score (1)"
+        ])
+
     for model_name, model in models.items():
         model, scores = train_model_with_cv(X_train, y_train, model)
 
@@ -150,12 +186,25 @@ def main():
             pickle.dump(model, file)
 
         y_pred = model.predict(X_test)
-        print(f"\\nRapport de classification sur l'ensemble de test pour {model_name} :")
-        print(classification_report(y_test, y_pred))
+        report = classification_report(y_test, y_pred, output_dict=True)
+        test_accuracy = accuracy_score(y_test, y_pred)
+
+        # Ajouter les métriques au fichier CSV
+        with open(csv_file_path, 'a', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow([
+                model_name,
+                f"{test_accuracy:.4f}",
+                f"{report['0']['precision']:.4f}",
+                f"{report['0']['recall']:.4f}",
+                f"{report['0']['f1-score']:.4f}",
+                f"{report['1']['precision']:.4f}",
+                f"{report['1']['recall']:.4f}",
+                f"{report['1']['f1-score']:.4f}"
+            ])
 
         # plot_learning_curves(scores, model_name, show_graphs=False)
         test_accuracy = plot_learning_curves(model, X_train, X_test, y_train, y_test, model_name, show_graphs=False)
-        print(f"Test Accuracy for {model_name}: {test_accuracy:.4f}")
     return 0
 
 if __name__ == "__main__":

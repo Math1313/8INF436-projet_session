@@ -17,27 +17,6 @@ def create_binary_target(data, target_column='num'):
 
     return data
 
-def exploration(data, save_graphs, display_graphs):
-    """
-    Fonction utilitaire qui permet d'explorer les données
-    """
-    # Afficher les histogrammes des toutes les variables
-    data.hist(bins=50, figsize=(15, 10))
-    if save_graphs: plt.savefig('../output/histograms.png')
-    if display_graphs: plt.show()
-
-    # Afficher les boîtes à moustaches pour toutes les variables numériques
-    # Cela permet de visualiser les valeurs aberrantes
-    data.select_dtypes(include=['int64', 'float64']).plot(kind='box', subplots=True, layout=(4, 6), figsize=(15, 10))
-    if save_graphs: plt.savefig('../output/boxplots.png')
-    if display_graphs: plt.show()
-
-    # Afficher les informations sur les données
-    # Permet de voir le nombre de valeurs manquantes et les types de données
-    print(data.info())
-    print(data.isnull().sum())
-    print(data.describe(include='all'))
-
 
 def preprocess_data_imputation(data):
     """
