@@ -5,12 +5,8 @@ import csv
 import pickle
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import KNNImputer
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler, OneHotEncoder
-from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split, cross_validate,learning_curve
-from imblearn.over_sampling import SMOTE
 import preprocess_data as prep_data
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC

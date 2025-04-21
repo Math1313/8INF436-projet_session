@@ -1,6 +1,5 @@
 import pickle
 import pandas as pd
-import preprocess_data as prep_data
 
 # Exemple de nouvelle donnée
 # Example 1 = 1

@@ -4,7 +4,7 @@ import glob
 import pickle
 import pandas as pd
 
-from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -232,7 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
             new_data = {
                 "age": int(self.age_edit.text().strip()),
                 "sex": "Male" if self.sex_combo.currentText() == "Homme" else "Female",
-                "location": self.location_combo.currentText(),
+                "dataset": self.location_combo.currentText(),
                 "cp": self.cp_combo.currentText(),
                 "fbs": self.fbs_checkbox.isChecked(),
                 "trestbps": int(self.trestbps_edit.text().strip()),
@@ -241,7 +241,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "thalch": int(self.thalch_edit.text().strip()),
                 "exang": self.exang_checkbox.isChecked(),
                 "oldpeak": float(self.oldpeak_edit.text().strip()),
-                "slop": self.slop_combo.currentText()
+                "slope": self.slop_combo.currentText()
             }
 
             # Conversion en DataFrame
